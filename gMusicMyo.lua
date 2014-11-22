@@ -1,8 +1,10 @@
 scriptId = 'com.kamikadzew.gMusicMyo'
+--User variables
+ENABLED_TIMEOUT = 2200		-- Time since last activity before we lock
+ROLL_SENS = 0.2					-- Roll bellow this number will be ignored
+VEL_SENS = 10000				-- Combination of this and next number will set velocity sensitivity and responsiveness
+VEL_COUNT = 30
 --Helper functions
-ENABLED_TIMEOUT = 2200
-ROLL_SENS = 0.25
-
 function conditionallySwapWave(pose)
     if myo.getArm() == "left" then
         if pose == "waveIn" then
@@ -98,8 +100,13 @@ function onPoseEdge(pose, edge)
 	if enabled and pose=="fist" then
 		if edge=="on" then
 			--myo.debug("YesFist")
+			vel=0
+			deltaRoll=0
 			fistMade=true
 			referenceRoll=currentRoll
+			if myo.getXDirection() == "towardElbow" then -- Adjusts for Myo orientation
+					referenceRoll = -referenceRoll
+			end
 		elseif edge=="off" then
 			--myo.debug("NoFist")
 			fistMade=false
@@ -107,7 +114,6 @@ function onPoseEdge(pose, edge)
 	end
 end
 
-vel=0
 -- onPeriodic runs every ~10ms
 function onPeriodic()
     local now = myo.getTimeMilliseconds()
@@ -127,14 +133,23 @@ function onPeriodic()
         extendUnlock()
     end
 
-    if enabled and fistMade then -- Moves page when fist is held and Myo is rotated
-		deltaRoll=currentRoll+referenceRoll
-		vel=vel+(math.floor(0.5+(100^math.abs(deltaRoll))))
+    if enabled and fistMade then
+		ndeltaRoll=currentRoll-referenceRoll
+	   if math.abs(deltaRoll-ndeltaRoll)>4 then --detecting rolls over 180 deg
+			turnover=not turnover				--flipping a 180 deg bit
+	   end
+	   deltaRoll=ndeltaRoll
+	   if turnover then
+			vel=vel+100
+		elseif not turnover then
+			vel=vel+(math.floor(0.5+(VEL_SENS^(math.abs(deltaRoll/3.1415926535897)))))
+			--myo.debug(math.floor(0.5+(VEL_SENS^(math.abs(deltaRoll/3.1415926535897)))))
+		end
 		--myo.debug(vel)
 		--myo.debug(referenceRoll)
 		--myo.debug(currentRoll)
 		--myo.debug(deltaRoll)
-		if vel>200 then
+		if vel>VEL_COUNT then
 			vel=0
 			--myo.debug("Volume Controll")
 			extendUnlock()
